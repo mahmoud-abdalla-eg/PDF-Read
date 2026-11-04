@@ -22,10 +22,12 @@
 .idea/
 
 # ------------------------------------------
-# Temporary Verification Files
+# Temporary Verification Files & Local Settings
 # ------------------------------------------
 verify_*.txt
 *.log
+settings.json
+*.settings.json
 
 # ------------------------------------------
 # Editor directories and files

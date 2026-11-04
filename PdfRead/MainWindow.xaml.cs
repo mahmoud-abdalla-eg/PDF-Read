@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -17,47 +18,154 @@ namespace PdfRead;
 
 public partial class MainWindow : Window
 {
+    private static CoreWebView2Environment? _sharedEnvironment;
+    private static readonly SemaphoreSlim _initLock = new(1, 1);
+    private bool _isWebViewReady;
+
     private readonly ObservableCollection<PdfDocumentTab> _tabs = new();
     private PdfDocumentTab? _activeTab;
+    private readonly AppSettings _settings = AppSettings.Load();
     private readonly OfficeConversionService _officeConverter = new();
     private readonly DocumentExportService _exportService = new();
     private readonly PdfEditorService _editorService = new();
     private readonly List<TextBlockItem> _currentTextBlocks = new();
-    private bool _isWebViewInitialized;
+
+    public WindowState PreviousNonMinimizedWindowState { get; private set; } = WindowState.Normal;
+
+    protected override void OnStateChanged(EventArgs e)
+    {
+        base.OnStateChanged(e);
+        if (WindowState != WindowState.Minimized)
+        {
+            PreviousNonMinimizedWindowState = WindowState;
+        }
+    }
 
     public MainWindow()
     {
         InitializeComponent();
+        LoadWindowIcon();
         Loaded += MainWindow_Loaded;
+
+        MainWebView.CoreWebView2InitializationCompleted += (s, e) =>
+        {
+            if (e.IsSuccess)
+            {
+                _isWebViewReady = true;
+                if (MainWebView.CoreWebView2 != null)
+                {
+                    MainWebView.CoreWebView2.Settings.IsStatusBarEnabled = false;
+                }
+            }
+        };
+    }
+
+    private void LoadWindowIcon()
+    {
+        try
+        {
+            string icoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "app.ico");
+            if (File.Exists(icoPath))
+            {
+                Icon = new System.Windows.Media.Imaging.BitmapImage(new Uri(icoPath, UriKind.Absolute));
+            }
+        }
+        catch { }
     }
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
-        await InitializeWebViewAsync();
+        RefreshRecentFilesUi();
 
-        if (_tabs.Count == 0)
+        // If tabs were already opened (e.g. from CLI arguments)
+        if (_tabs.Count > 0 && _activeTab != null && !string.IsNullOrEmpty(_activeTab.FilePath))
         {
-            CreateNewTab();
+            await LoadPdfInTabAsync(_activeTab);
+        }
+        else
+        {
+            ShowHomeView();
         }
     }
 
-    private async Task InitializeWebViewAsync()
+    private async Task EnsureWebViewReadyAsync()
     {
-        if (_isWebViewInitialized) return;
+        if (_isWebViewReady && MainWebView.CoreWebView2 != null) return;
 
+        await _initLock.WaitAsync();
         try
         {
-            var env = await CoreWebView2Environment.CreateAsync(userDataFolder: Path.Combine(Path.GetTempPath(), "PdfRead_WebView2"));
-            await MainWebView.EnsureCoreWebView2Async(env);
-            _isWebViewInitialized = true;
+            if (_isWebViewReady && MainWebView.CoreWebView2 != null) return;
 
-            // Configure Edge PDF viewer settings
-            MainWebView.CoreWebView2.Settings.IsStatusBarEnabled = false;
+            if (_sharedEnvironment == null)
+            {
+                string appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                string userDataFolder = Path.Combine(appData, "PdfRead", "WebView2");
+                Directory.CreateDirectory(userDataFolder);
+                _sharedEnvironment = await CoreWebView2Environment.CreateAsync(userDataFolder: userDataFolder);
+            }
+
+            if (MainWebView.CoreWebView2 == null)
+            {
+                await MainWebView.EnsureCoreWebView2Async(_sharedEnvironment);
+            }
+
+            _isWebViewReady = true;
+            if (MainWebView.CoreWebView2 != null)
+            {
+                MainWebView.CoreWebView2.Settings.IsStatusBarEnabled = false;
+            }
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Failed to initialize WebView2: {ex.Message}", "WebView2 Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            try
+            {
+                if (MainWebView.CoreWebView2 == null)
+                {
+                    await MainWebView.EnsureCoreWebView2Async();
+                }
+                _isWebViewReady = true;
+            }
+            catch { }
+
+            if (MainWebView.CoreWebView2 != null)
+            {
+                _isWebViewReady = true;
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine($"WebView2 initialization notice: {ex.Message}");
+            }
         }
+        finally
+        {
+            _initLock.Release();
+        }
+    }
+
+    public void ShowHomeView()
+    {
+        HomeViewGrid.Visibility = Visibility.Visible;
+        DocumentViewGrid.Visibility = Visibility.Collapsed;
+        TxtDocInfo.Text = "Home";
+        TxtStatus.Text = "Welcome to PdfRead";
+        RefreshRecentFilesUi();
+        RebuildTabsUi();
+    }
+
+    public void ShowDocumentView()
+    {
+        HomeViewGrid.Visibility = Visibility.Collapsed;
+        DocumentViewGrid.Visibility = Visibility.Visible;
+    }
+
+    private void RefreshRecentFilesUi()
+    {
+        var existing = _settings.RecentFiles.Where(r => File.Exists(r.FilePath)).ToList();
+        LstRecentFiles.ItemsSource = null;
+        LstRecentFiles.ItemsSource = existing;
+
+        EmptyRecentState.Visibility = existing.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     public void OpenTarget(string path)
@@ -73,7 +181,7 @@ public partial class MainWindow : Window
                 // If Office file, automatically convert to PDF first
                 if (ext is ".docx" or ".doc" or ".xlsx" or ".xls" or ".pptx" or ".ppt")
                 {
-                    TxtStatus.Text = $"Converting {Path.GetFileName(path)} to PDF via Microsoft Office...";
+                    TxtStatus.Text = $"Converting {Path.GetFileName(path)} to PDF...";
                     string convertedPdf = await _officeConverter.ConvertToPdfAsync(path);
                     path = convertedPdf;
                 }
@@ -88,21 +196,14 @@ public partial class MainWindow : Window
                     return;
                 }
 
-                // If active tab is untitled and unmodified, reuse it
-                PdfDocumentTab targetTab;
-                if (_activeTab != null && string.IsNullOrEmpty(_activeTab.FilePath) && !_activeTab.IsModified)
-                {
-                    targetTab = _activeTab;
-                }
-                else
-                {
-                    targetTab = CreateNewTab();
-                }
+                // Create new tab for document
+                var targetTab = new PdfDocumentTab { FilePath = path };
+                _tabs.Add(targetTab);
 
-                targetTab.FilePath = path;
-                SelectTab(targetTab);
+                SelectTab(targetTab, loadImmediately: false);
                 await LoadPdfInTabAsync(targetTab);
-                TxtStatus.Text = $"Loaded: {Path.GetFileName(path)}";
+                TxtDocInfo.Text = path;
+                TxtStatus.Text = $"Opened: {Path.GetFileName(path)}";
             }
             catch (Exception ex)
             {
@@ -112,33 +213,16 @@ public partial class MainWindow : Window
         });
     }
 
-    private PdfDocumentTab CreateNewTab(string? filePath = null)
-    {
-        var tab = new PdfDocumentTab
-        {
-            FilePath = filePath ?? string.Empty
-        };
-
-        _tabs.Add(tab);
-        RebuildTabsUi();
-        SelectTab(tab);
-
-        return tab;
-    }
-
-    private void SelectTab(PdfDocumentTab tab)
+    private void SelectTab(PdfDocumentTab tab, bool loadImmediately = true)
     {
         _activeTab = tab;
+        ShowDocumentView();
         RebuildTabsUi();
 
-        if (!string.IsNullOrEmpty(tab.FilePath) && File.Exists(tab.FilePath))
+        if (loadImmediately && !string.IsNullOrEmpty(tab.FilePath) && File.Exists(tab.FilePath))
         {
             _ = LoadPdfInTabAsync(tab);
             TxtDocInfo.Text = tab.FilePath;
-        }
-        else
-        {
-            TxtDocInfo.Text = "Untitled Document";
         }
     }
 
@@ -149,7 +233,8 @@ public partial class MainWindow : Window
 
         if (_tabs.Count == 0)
         {
-            CreateNewTab();
+            _activeTab = null;
+            ShowHomeView();
         }
         else
         {
@@ -160,12 +245,11 @@ public partial class MainWindow : Window
 
     private void RebuildTabsUi()
     {
-        // Keep BtnNewTab at the end
         TabsContainer.Children.Clear();
 
         foreach (var tab in _tabs)
         {
-            bool isActive = tab == _activeTab;
+            bool isActive = tab == _activeTab && DocumentViewGrid.Visibility == Visibility.Visible;
             var btnStyle = (Style)FindResource(isActive ? "ActiveTabItemButtonStyle" : "TabItemButtonStyle");
 
             var tabBtn = new Button
@@ -175,6 +259,22 @@ public partial class MainWindow : Window
             };
 
             var panel = new StackPanel { Orientation = Orientation.Horizontal };
+
+            string iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "app.png");
+            if (File.Exists(iconPath))
+            {
+                var tabIcon = new Image
+                {
+                    Source = new System.Windows.Media.Imaging.BitmapImage(new Uri(iconPath, UriKind.Absolute)),
+                    Width = 14,
+                    Height = 14,
+                    Margin = new Thickness(0, 0, 6, 0),
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                RenderOptions.SetBitmapScalingMode(tabIcon, BitmapScalingMode.HighQuality);
+                panel.Children.Add(tabIcon);
+            }
+
             var titleBlock = new TextBlock
             {
                 Text = tab.Title + (tab.IsModified ? " •" : ""),
@@ -215,21 +315,98 @@ public partial class MainWindow : Window
     {
         if (string.IsNullOrEmpty(tab.FilePath) || !File.Exists(tab.FilePath)) return;
 
-        await InitializeWebViewAsync();
+        ShowDocumentView();
 
-        if (_isWebViewInitialized)
+        await EnsureWebViewReadyAsync();
+
+        string fileUri = new Uri(tab.FilePath).AbsoluteUri;
+        if (MainWebView.CoreWebView2 != null)
         {
-            // Navigate directly to the local PDF file path using file:// protocol
-            string fileUri = new Uri(tab.FilePath).AbsoluteUri;
             MainWebView.CoreWebView2.Navigate(fileUri);
         }
+        else
+        {
+            MainWebView.Source = new Uri(tab.FilePath);
+        }
+
+        _settings.AddRecentFile(tab.FilePath);
+        RefreshRecentFilesUi();
     }
 
-    // ----------------- TOOLBAR BUTTON HANDLERS -----------------
+    // ----------------- HOME SCREEN & TOOLBAR ACTIONS -----------------
+
+    private void BtnHome_Click(object sender, RoutedEventArgs e)
+    {
+        ShowHomeView();
+    }
 
     private void BtnNewTab_Click(object sender, RoutedEventArgs e)
     {
-        CreateNewTab();
+        BtnOpen_Click(sender, e);
+    }
+
+    private void BtnOpenRecentItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is string path && File.Exists(path))
+        {
+            OpenTarget(path);
+        }
+    }
+
+    private void BtnClearRecent_Click(object sender, RoutedEventArgs e)
+    {
+        if (MessageBox.Show("Clear all recent file history?", "Clear Recent Files", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+        {
+            _settings.RecentFiles.Clear();
+            _settings.Save();
+            RefreshRecentFilesUi();
+        }
+    }
+
+    private void BtnHomeEditPdf_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new OpenFileDialog
+        {
+            Filter = "PDF Files (*.pdf)|*.pdf|All Files (*.*)|*.*",
+            Title = "Select PDF Document to Edit"
+        };
+
+        if (dlg.ShowDialog(this) == true)
+        {
+            OpenTarget(dlg.FileName);
+            TextEditOverlayPanel.Visibility = Visibility.Visible;
+            _ = ScanCurrentPageText();
+        }
+    }
+
+    private void BtnHomeExportWord_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new OpenFileDialog
+        {
+            Filter = "PDF Files (*.pdf)|*.pdf|All Files (*.*)|*.*",
+            Title = "Select PDF Document to Export to Word"
+        };
+
+        if (dlg.ShowDialog(this) == true)
+        {
+            OpenTarget(dlg.FileName);
+            BtnExportWord_Click(sender, e);
+        }
+    }
+
+    private void BtnHomeExportExcel_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new OpenFileDialog
+        {
+            Filter = "PDF Files (*.pdf)|*.pdf|All Files (*.*)|*.*",
+            Title = "Select PDF Document to Export to Excel"
+        };
+
+        if (dlg.ShowDialog(this) == true)
+        {
+            OpenTarget(dlg.FileName);
+            BtnExportExcel_Click(sender, e);
+        }
     }
 
     private void BtnOpen_Click(object sender, RoutedEventArgs e)
@@ -237,7 +414,7 @@ public partial class MainWindow : Window
         var dlg = new OpenFileDialog
         {
             Filter = "All Supported Files (*.pdf;*.docx;*.xlsx;*.pptx)|*.pdf;*.docx;*.xlsx;*.pptx|PDF Files (*.pdf)|*.pdf|Word Documents (*.docx;*.doc)|*.docx;*.doc|Excel Spreadsheets (*.xlsx;*.xls)|*.xlsx;*.xls|All Files (*.*)|*.*",
-            Title = "Open PDF or Document"
+            Title = "Open Document"
         };
 
         if (dlg.ShowDialog(this) == true)
@@ -269,7 +446,7 @@ public partial class MainWindow : Window
             }
             else
             {
-                TxtStatus.Text = "Document is already up-to-date.";
+                TxtStatus.Text = "Document is up-to-date.";
             }
         }
         catch (Exception ex)
@@ -311,7 +488,7 @@ public partial class MainWindow : Window
 
         try
         {
-            TxtStatus.Text = "Scanning page text blocks...";
+            TxtStatus.Text = "Scanning page text elements...";
             var blocks = await _editorService.ExtractTextBlocksAsync(_activeTab.FilePath, _activeTab.CurrentPage);
             _currentTextBlocks.Clear();
             _currentTextBlocks.AddRange(blocks);
@@ -466,7 +643,7 @@ public partial class MainWindow : Window
         {
             try
             {
-                TxtStatus.Text = $"Converting {Path.GetFileName(dlg.FileName)} via Microsoft Office...";
+                TxtStatus.Text = $"Converting {Path.GetFileName(dlg.FileName)} to PDF...";
                 string pdfPath = await _officeConverter.ConvertToPdfAsync(dlg.FileName);
                 TxtStatus.Text = $"Converted: {Path.GetFileName(pdfPath)}";
                 OpenTarget(pdfPath);
@@ -493,11 +670,10 @@ public partial class MainWindow : Window
 
     private void TriggerSearch()
     {
-        // Edge WebView2 native PDF viewer supports Ctrl+F
         MainWebView.Focus();
     }
 
-    private void BtnIntegration_Click(object sender, RoutedEventArgs e)
+    private void BtnSettings_Click(object sender, RoutedEventArgs e)
     {
         var settingsWin = new SettingsWindow { Owner = this };
         settingsWin.ShowDialog();
@@ -543,7 +719,7 @@ public partial class MainWindow : Window
                     e.Handled = true;
                     break;
                 case Key.T:
-                    CreateNewTab();
+                    BtnNewTab_Click(this, new RoutedEventArgs());
                     e.Handled = true;
                     break;
                 case Key.W:

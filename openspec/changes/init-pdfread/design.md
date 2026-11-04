@@ -2,7 +2,7 @@
 
 ## Context
 
-`PdfRead` is a native Windows PDF viewer, editor, and conversion suite located in `E:\md file viewer\pdfread repo folder`. It builds upon the proven desktop patterns of `MarkRead` (C# .NET 8 WPF, WebView2, named pipe IPC, Zinc reading theme, and registry shell integrations) while focusing entirely on PDF documents, in-place non-shifting text editing, and bi-directional Microsoft Office conversions. See `proposal.md` for motivation and background.
+`PdfRead` is a native Windows PDF viewer, editor, and conversion suite. It builds upon the proven desktop patterns of `MarkRead` (C# .NET 8 WPF, WebView2, named pipe IPC, Zinc reading theme, and registry shell integrations) while focusing entirely on PDF documents, in-place non-shifting text editing, and bi-directional Microsoft Office conversions. See `proposal.md` for motivation and background.
 
 ## Goals / Non-Goals
 

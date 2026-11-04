@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
         Title="Settings &amp; Windows Integration - PdfRead"
+        Icon="Assets/app.ico"
         Height="620" Width="680"
         MinHeight="500" MinWidth="580"
         WindowStartupLocation="CenterOwner"
@@ -109,9 +110,8 @@
         <!-- Header -->
         <Border Grid.Row="0" Background="#0C0C0E" BorderBrush="#27272A" BorderThickness="0,0,0,1" Padding="20,16">
             <StackPanel Orientation="Horizontal">
-                <Border Width="34" Height="34" CornerRadius="6" Background="#C62828" Margin="0,0,14,0" VerticalAlignment="Center">
-                    <TextBlock Text="PDF" Foreground="#FFFFFF" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                </Border>
+                <Image Source="Assets/app.png" Width="34" Height="34" Margin="0,0,14,0" VerticalAlignment="Center"
+                       RenderOptions.BitmapScalingMode="HighQuality"/>
                 <StackPanel VerticalAlignment="Center">
                     <TextBlock Text="PdfRead Settings &amp; Shell Integration" FontWeight="Bold" FontSize="16" Foreground="#FAFAFA"/>
                     <TextBlock Text="Update desktop and taskbar shortcuts, startup options, and Windows Explorer context menus" Foreground="#71717A" FontSize="12" Margin="0,2,0,0"/>

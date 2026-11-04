@@ -32,6 +32,6 @@ Users who appreciate MarkRead's fast, document-grade reading typography, tabbed 
 
 ## Impact
 
-* **New Codebase**: Initializes `PdfRead` in `E:\md file viewer\pdfread repo folder\PdfRead` targeting `net8.0-windows`.
+* **New Codebase**: Initializes `PdfRead` in `PdfRead/` targeting `net8.0-windows`.
 * **Dependencies**: Microsoft.Web.WebView2, PDFsharp / PdfPig for PDF coordinate extraction and stream updates, ClosedXML for Excel generation, DocumentFormat.OpenXml for Word generation, and Microsoft Office Interop for background conversion.
 * **Shell Scripts**: New standalone scripts in `scripts/` and root launchers (`Launch PdfRead.bat`, `build.bat`).

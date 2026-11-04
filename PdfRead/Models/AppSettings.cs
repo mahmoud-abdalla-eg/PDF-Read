@@ -11,6 +11,32 @@ public class AppSettings
     public bool ContinuousScroll { get; set; } = true;
     public bool ShowThumbnailsSidebar { get; set; } = true;
     public string DefaultExportFormat { get; set; } = "docx";
+    public System.Collections.Generic.List<RecentFileItem> RecentFiles { get; set; } = new();
+
+    public void AddRecentFile(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return;
+
+        RecentFiles.RemoveAll(r => string.Equals(r.FilePath, path, StringComparison.OrdinalIgnoreCase));
+        RecentFiles.Insert(0, new RecentFileItem
+        {
+            FilePath = path,
+            LastOpened = DateTime.Now
+        });
+
+        if (RecentFiles.Count > 30)
+        {
+            RecentFiles = RecentFiles.GetRange(0, 30);
+        }
+
+        Save();
+    }
+
+    public void RemoveRecentFile(string path)
+    {
+        RecentFiles.RemoveAll(r => string.Equals(r.FilePath, path, StringComparison.OrdinalIgnoreCase));
+        Save();
+    }
 
     private static readonly string SettingsPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
