@@ -1,0 +1,319 @@
+<Window x:Class="PdfRead.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        mc:Ignorable="d"
+        Title="PdfRead - High-Performance PDF Reader &amp; Editor"
+        Height="800" Width="1180"
+        MinHeight="500" MinWidth="750"
+        WindowStartupLocation="CenterScreen"
+        AllowDrop="True"
+        PreviewDragOver="Window_PreviewDragOver"
+        Drop="Window_Drop"
+        KeyDown="Window_KeyDown"
+        Background="#09090B"
+        Foreground="#F4F4F5"
+        FontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif">
+
+    <Window.Resources>
+        <!-- Modern ScrollViewer style for tab bar -->
+        <Style x:Key="TabScrollViewerStyle" TargetType="{x:Type ScrollViewer}">
+            <Setter Property="HorizontalScrollBarVisibility" Value="Hidden"/>
+            <Setter Property="VerticalScrollBarVisibility" Value="Disabled"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ScrollViewer}">
+                        <ScrollContentPresenter />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Modern Tab Button Style -->
+        <Style x:Key="TabItemButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#121215"/>
+            <Setter Property="Foreground" Value="#A1A1AA"/>
+            <Setter Property="BorderThickness" Value="1,1,1,0"/>
+            <Setter Property="BorderBrush" Value="#27272A"/>
+            <Setter Property="Padding" Value="12,6,8,6"/>
+            <Setter Property="Margin" Value="0,0,4,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="TabBorder" Background="{TemplateBinding Background}" 
+                                BorderBrush="{TemplateBinding BorderBrush}" 
+                                BorderThickness="{TemplateBinding BorderThickness}" 
+                                CornerRadius="6,6,0,0" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="TabBorder" Property="Background" Value="#18181B"/>
+                                <Setter Property="Foreground" Value="#F4F4F5"/>
+                                <Setter TargetName="TabBorder" Property="BorderBrush" Value="#3F3F46"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Active Tab Button Style -->
+        <Style x:Key="ActiveTabItemButtonStyle" TargetType="Button" BasedOn="{StaticResource TabItemButtonStyle}">
+            <Setter Property="Background" Value="#18181B"/>
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+            <Setter Property="BorderBrush" Value="#E53935"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+
+        <!-- Toolbar Button Style -->
+        <Style x:Key="ToolbarButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#121215"/>
+            <Setter Property="Foreground" Value="#E4E4E7"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="#27272A"/>
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="Margin" Value="2,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Medium"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="BtnBorder" Background="{TemplateBinding Background}" 
+                                BorderBrush="{TemplateBinding BorderBrush}" 
+                                BorderThickness="{TemplateBinding BorderThickness}" 
+                                CornerRadius="6" 
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="BtnBorder" Property="Background" Value="#27272A"/>
+                                <Setter TargetName="BtnBorder" Property="BorderBrush" Value="#3F3F46"/>
+                                <Setter Property="Foreground" Value="#FAFAFA"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="BtnBorder" Property="Background" Value="#18181B"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Accent Primary Button Style (Red Crimson) -->
+        <Style x:Key="AccentButtonStyle" TargetType="Button" BasedOn="{StaticResource ToolbarButtonStyle}">
+            <Setter Property="Background" Value="#C62828"/>
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+            <Setter Property="BorderBrush" Value="#E53935"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="BtnBorder" Background="{TemplateBinding Background}" 
+                                BorderBrush="{TemplateBinding BorderBrush}" 
+                                BorderThickness="{TemplateBinding BorderThickness}" 
+                                CornerRadius="6" 
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="BtnBorder" Property="Background" Value="#D32F2F"/>
+                                <Setter TargetName="BtnBorder" Property="BorderBrush" Value="#EF5350"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/> <!-- Title / Tab Bar -->
+            <RowDefinition Height="Auto"/> <!-- Toolbar -->
+            <RowDefinition Height="*"/>    <!-- Main PDF / Editor Viewport -->
+            <RowDefinition Height="Auto"/> <!-- Status Bar -->
+        </Grid.RowDefinitions>
+
+        <!-- 1. Custom Tab Bar Header -->
+        <Border Grid.Row="0" Background="#0C0C0E" BorderBrush="#27272A" BorderThickness="0,0,0,1" Padding="8,6,8,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/> <!-- Logo Badge -->
+                    <ColumnDefinition Width="*"/>    <!-- Tabs ScrollArea -->
+                    <ColumnDefinition Width="Auto"/> <!-- Window Actions -->
+                </Grid.ColumnDefinitions>
+
+                <!-- Brand Logo Badge -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,14,6">
+                    <Border Background="#C62828" CornerRadius="5" Width="26" Height="26" Margin="0,0,8,0" VerticalAlignment="Center">
+                        <TextBlock Text="PDF" Foreground="#FFFFFF" FontWeight="Bold" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Text="PdfRead" Foreground="#FAFAFA" FontWeight="Bold" FontSize="14" VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- Tabs Container -->
+                <ScrollViewer Grid.Column="1" Style="{StaticResource TabScrollViewerStyle}" HorizontalScrollBarVisibility="Auto">
+                    <StackPanel x:Name="TabsContainer" Orientation="Horizontal" VerticalAlignment="Bottom">
+                        <!-- Dynamic Tabs Injected Here in Code-Behind -->
+                        <Button x:Name="BtnNewTab" Content="+" ToolTip="New Tab (Ctrl+T)" Width="28" Height="28" 
+                                Style="{StaticResource ToolbarButtonStyle}" Margin="2,0,0,0" Click="BtnNewTab_Click"/>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- Quick Actions -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="6,0,0,6">
+                    <Button Content="⚙ Settings" Style="{StaticResource ToolbarButtonStyle}" Click="BtnIntegration_Click" ToolTip="Shortcuts, Taskbar, Startup &amp; Shell Integration"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- 2. Main Toolbar -->
+        <Border Grid.Row="1" Background="#121215" BorderBrush="#27272A" BorderThickness="0,0,0,1" Padding="8,6">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/> <!-- Document Actions -->
+                    <ColumnDefinition Width="Auto"/> <!-- Editing Tools -->
+                    <ColumnDefinition Width="Auto"/> <!-- Conversion Tools -->
+                    <ColumnDefinition Width="*"/>    <!-- Spacer -->
+                    <ColumnDefinition Width="Auto"/> <!-- Search & View -->
+                </Grid.ColumnDefinitions>
+
+                <!-- Group 1: Document File Actions -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <Button Content="📂 Open" ToolTip="Open PDF File (Ctrl+O)" Style="{StaticResource ToolbarButtonStyle}" Click="BtnOpen_Click"/>
+                    <Button Content="💾 Save" ToolTip="Save Document (Ctrl+S)" Style="{StaticResource ToolbarButtonStyle}" Click="BtnSave_Click"/>
+                    <Separator Background="#27272A" Margin="6,2" Width="1"/>
+                </StackPanel>
+
+                <!-- Group 2: In-Place Editing & Pages -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <Button x:Name="BtnTextEditMode" Content="✏ Text Edit" ToolTip="Edit Text In-Place without moving layout" 
+                            Style="{StaticResource ToolbarButtonStyle}" Click="BtnTextEditMode_Click"/>
+                    <Button Content="↻ Rotate" ToolTip="Rotate Page 90° Clockwise" Style="{StaticResource ToolbarButtonStyle}" Click="BtnRotate_Click"/>
+                    <Button Content="🗑 Delete Page" ToolTip="Delete Current Page" Style="{StaticResource ToolbarButtonStyle}" Click="BtnDeletePage_Click"/>
+                    <Separator Background="#27272A" Margin="6,2" Width="1"/>
+                </StackPanel>
+
+                <!-- Group 3: Bi-Directional Conversions -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <Button Content="📊 To Excel (.xlsx)" ToolTip="Extract tables and export to Excel spreadsheet" 
+                            Style="{StaticResource ToolbarButtonStyle}" Click="BtnExportExcel_Click"/>
+                    <Button Content="📝 To Word (.docx)" ToolTip="Export document to editable Word" 
+                            Style="{StaticResource ToolbarButtonStyle}" Click="BtnExportWord_Click"/>
+                    <Button Content="⚡ Convert Office to PDF" ToolTip="Convert any Word/Excel file into PDF" 
+                            Style="{StaticResource AccentButtonStyle}" Click="BtnConvertOffice_Click"/>
+                </StackPanel>
+
+                <!-- Group 4: Search & Page Jump -->
+                <StackPanel Grid.Column="4" Orientation="Horizontal">
+                    <TextBox x:Name="TxtSearch" Width="160" Background="#18181B" Foreground="#F4F4F5" 
+                             BorderBrush="#3F3F46" BorderThickness="1" Padding="6,4" VerticalAlignment="Center" 
+                             KeyDown="TxtSearch_KeyDown"/>
+                    <Button Content="🔍" ToolTip="Search In Document (Ctrl+F)" Style="{StaticResource ToolbarButtonStyle}" Click="BtnSearch_Click"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- 3. Central Viewer / Editor Area -->
+        <Grid Grid.Row="2">
+            <!-- WebView2 Control Container -->
+            <Grid x:Name="WebViewContainer" Background="#09090B">
+                <wv2:WebView2 x:Name="MainWebView" Visibility="Visible"/>
+            </Grid>
+
+            <!-- In-Place Text Editing Overlay Panel (Collapsible) -->
+            <Border x:Name="TextEditOverlayPanel" Visibility="Collapsed" HorizontalAlignment="Right" VerticalAlignment="Stretch" 
+                    Width="360" Background="#121215" BorderBrush="#27272A" BorderThickness="1,0,0,0" Padding="14">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0">
+                        <DockPanel Margin="0,0,0,12">
+                            <TextBlock Text="In-Place Text Editor" FontWeight="Bold" FontSize="14" Foreground="#FAFAFA" VerticalAlignment="Center"/>
+                            <Button Content="✕" HorizontalAlignment="Right" Width="24" Height="24" 
+                                    Style="{StaticResource ToolbarButtonStyle}" Click="BtnCloseTextEdit_Click"/>
+                        </DockPanel>
+                        <TextBlock Text="Edit text directly where it is without shifting layout. Adjust dimensions and font size as needed." 
+                                   TextWrapping="Wrap" Foreground="#A1A1AA" FontSize="12" Margin="0,0,0,12"/>
+                        <Button Content="🔍 Scan Page Text Elements" Style="{StaticResource ToolbarButtonStyle}" 
+                                Margin="0,0,0,10" Click="BtnScanPageText_Click"/>
+                    </StackPanel>
+
+                    <!-- Text Blocks List -->
+                    <ListBox x:Name="LstTextBlocks" Grid.Row="1" Background="#18181B" BorderBrush="#27272A" 
+                             Foreground="#F4F4F5" SelectionChanged="LstTextBlocks_SelectionChanged" Margin="0,0,0,12">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Padding="6" BorderBrush="#27272A" BorderThickness="0,0,0,1">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Text}" TextTrimming="CharacterEllipsis" FontWeight="SemiBold" Foreground="#FAFAFA"/>
+                                        <TextBlock Text="{Binding FontFamily}" FontSize="11" Foreground="#71717A"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <!-- Selected Text Block Form -->
+                    <StackPanel x:Name="PnlBlockEditor" Grid.Row="2" Visibility="Collapsed">
+                        <TextBlock Text="Edit Content:" Foreground="#A1A1AA" FontSize="11" Margin="0,0,0,4"/>
+                        <TextBox x:Name="TxtBlockContent" Background="#18181B" Foreground="#FFFFFF" BorderBrush="#3F3F46" 
+                                 Padding="6" MinHeight="60" TextWrapping="Wrap" AcceptsReturn="True" Margin="0,0,0,8"/>
+
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Margin="0,0,4,0">
+                                <TextBlock Text="Font Size (pt):" Foreground="#A1A1AA" FontSize="11" Margin="0,0,0,4"/>
+                                <TextBox x:Name="TxtBlockFontSize" Background="#18181B" Foreground="#FFFFFF" BorderBrush="#3F3F46" Padding="4"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Margin="4,0,0,0">
+                                <TextBlock Text="Font Family:" Foreground="#A1A1AA" FontSize="11" Margin="0,0,0,4"/>
+                                <TextBox x:Name="TxtBlockFontFamily" Background="#18181B" Foreground="#FFFFFF" BorderBrush="#3F3F46" Padding="4"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <Button Content="✓ Apply Edit to Page" Style="{StaticResource AccentButtonStyle}" Click="BtnApplyBlockEdit_Click"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Drop Overlay for Drag & Drop -->
+            <Border x:Name="DropOverlay" Visibility="Collapsed" Background="#D909090B">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Border Background="#C62828" CornerRadius="12" Width="64" Height="64" Margin="0,0,0,16">
+                        <TextBlock Text="PDF" Foreground="#FFFFFF" FontWeight="Bold" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Text="Drop PDF or Office Document Here" FontSize="18" FontWeight="SemiBold" Foreground="#FAFAFA" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Opens PDF or automatically converts Word/Excel" FontSize="13" Foreground="#A1A1AA" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- 4. Modern Status Bar -->
+        <Border Grid.Row="3" Background="#0C0C0E" BorderBrush="#27272A" BorderThickness="0,1,0,0" Padding="12,5">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock x:Name="TxtStatus" Text="Ready" Foreground="#A1A1AA" FontSize="12" VerticalAlignment="Center"/>
+                <TextBlock x:Name="TxtDocInfo" Grid.Column="1" Text="No document open" Foreground="#71717A" FontSize="12" VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

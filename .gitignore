@@ -1,0 +1,43 @@
+# ==========================================
+# PdfRead - Root .gitignore
+# ==========================================
+
+# ------------------------------------------
+# .NET / Visual Studio Build Artifacts
+# ------------------------------------------
+**/[Bb]in/
+**/[Oo]bj/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.DotSettings.user
+*.pdb
+*.cache
+*.vspscc
+*.vssscc
+
+# Visual Studio / Rider directories
+.vs/
+.idea/
+
+# ------------------------------------------
+# Temporary Verification Files
+# ------------------------------------------
+verify_*.txt
+*.log
+
+# ------------------------------------------
+# Editor directories and files
+# ------------------------------------------
+.vscode/*
+!.vscode/extensions.json
+
+# ------------------------------------------
+# Operating System files
+# ------------------------------------------
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
